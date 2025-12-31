@@ -17,6 +17,15 @@ function getMaxTime(results) {
   return max || 100;
 }
 
+function getMaxSize(results) {
+  let max = 0;
+  results.forEach(r => {
+    if (r.lazyImage?.size) max = Math.max(max, r.lazyImage.size);
+    if (r.sharp?.size) max = Math.max(max, r.sharp.size);
+  });
+  return max || 1;
+}
+
 function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -27,10 +36,10 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleUpload = useCallback(async (file) => {
-    // ファイルサイズチェック（10GB制限）
+    // File size check (10GB limit)
     const maxSize = 10 * 1024 * 1024 * 1024; // 10GB
     if (file.size > maxSize) {
-      setError(`ファイルサイズが大きすぎます。最大10GBまで対応しています。現在のファイル: ${formatBytes(file.size)}`);
+      setError(`File size too large. Maximum size is 10GB. Current file: ${formatBytes(file.size)}`);
       return;
     }
 
@@ -139,7 +148,7 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>lazy-image vs sharp</h1>
-        <p>画像処理ライブラリのリアルタイムベンチマーク比較</p>
+        <p>Real-time benchmark comparison of image processing libraries</p>
         <div className="version-badges">
           <span className="badge rust">lazy-image {results?.versions?.lazyImage || '0.8.x'}</span>
           <span className="badge sharp">sharp {results?.versions?.sharp || 'latest'}</span>
@@ -154,15 +163,15 @@ function App() {
         onClick={() => document.getElementById('file-input').click()}
       >
         <div className="uploader-icon">📸</div>
-        <h3>ドラッグ&ドロップで画像をアップロード</h3>
-        <p>または クリックしてファイルを選択 (JPEG, PNG, WebP, AVIF)</p>
-        <p className="uploader-note">最大10GBまで対応</p>
+        <h3>Drag & Drop to upload image</h3>
+        <p>or click to select file (JPEG, PNG, WebP, AVIF)</p>
+        <p className="uploader-note">Supports up to 10GB</p>
         {selectedFile && (
           <div className="selected-file-info">
             <span className="file-name">{selectedFile.name}</span>
             <span className="file-size">{formatBytes(selectedFile.size)}</span>
             {selectedFile.size > 100 * 1024 * 1024 && (
-              <span className="file-warning">⚠️ 大きなファイルです。処理に時間がかかる場合があります。</span>
+              <span className="file-warning">⚠️ Large file. Processing may take some time.</span>
             )}
           </div>
         )}
@@ -177,7 +186,7 @@ function App() {
       {loading && (
         <div className="loading">
           <div className="spinner"></div>
-          <p>ベンチマーク実行中...</p>
+          <p>Running benchmark...</p>
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="upload-progress">
               <div className="progress-bar-container">
@@ -186,7 +195,7 @@ function App() {
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
-              <p className="progress-text">アップロード中: {Math.round(uploadProgress)}%</p>
+              <p className="progress-text">Uploading: {Math.round(uploadProgress)}%</p>
             </div>
           )}
         </div>
@@ -194,7 +203,7 @@ function App() {
 
       {error && (
         <div className="error">
-          <p>エラー: {error}</p>
+          <p>Error: {error}</p>
         </div>
       )}
 
@@ -202,7 +211,7 @@ function App() {
         <>
           <div className="original-info">
             <div className="original-details">
-              <h3>オリジナル画像</h3>
+              <h3>Original Image</h3>
               <div className="original-stats">
                 <span>📁 {results.original.filename}</span>
                 <span>📐 {results.original.width} × {results.original.height}</span>
@@ -238,6 +247,7 @@ function App() {
 
 function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview }) {
   const maxTime = getMaxTime(category.results);
+  const maxSize = getMaxSize(category.results);
   const headerClass = category.highlight === 'lazyImage' ? 'lazyImage' 
     : category.highlight === 'sharp' ? 'sharp' : 'neutral';
 
@@ -253,20 +263,28 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
         <table className="result-table">
           <thead>
             <tr>
-              <th>操作</th>
+              <th>Operation</th>
               <th>lazy-image</th>
               <th>sharp</th>
-              <th>処理時間比較</th>
+              <th>Time Comparison</th>
+              <th>Size Comparison</th>
             </tr>
           </thead>
           <tbody>
             {category.results.map((result, resIdx) => {
-              const lazyWins = result.lazyImage?.supported && result.sharp?.supported 
+              const lazyWinsTime = result.lazyImage?.supported && result.sharp?.supported 
                 && result.lazyImage.time != null && result.sharp.time != null
                 && result.lazyImage.time < result.sharp.time;
-              const sharpWins = result.lazyImage?.supported && result.sharp?.supported 
+              const sharpWinsTime = result.lazyImage?.supported && result.sharp?.supported 
                 && result.lazyImage.time != null && result.sharp.time != null
                 && result.sharp.time < result.lazyImage.time;
+              
+              const lazyWinsSize = result.lazyImage?.supported && result.sharp?.supported 
+                && result.lazyImage.size != null && result.sharp.size != null
+                && result.lazyImage.size < result.sharp.size;
+              const sharpWinsSize = result.lazyImage?.supported && result.sharp?.supported 
+                && result.lazyImage.size != null && result.sharp.size != null
+                && result.sharp.size < result.lazyImage.size;
               
               const isSelected = selectedPreview?.category === catIdx && selectedPreview?.result === resIdx;
 
@@ -277,42 +295,48 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
                   style={{ cursor: 'pointer', background: isSelected ? 'rgba(88, 166, 255, 0.1)' : undefined }}
                 >
                   <td className="operation-name">{result.operation}</td>
-                  <td className={`result-cell ${lazyWins ? 'winner' : ''} ${!result.lazyImage?.supported ? 'not-supported' : ''}`}>
+                  <td className={`result-cell ${lazyWinsTime || lazyWinsSize ? 'winner' : ''} ${!result.lazyImage?.supported ? 'not-supported' : ''}`}>
                     {result.lazyImage?.supported ? (
                       <>
                         <div className="time-value">
                           {result.lazyImage.time != null ? (
                             <>
                               <span>{result.lazyImage.time}ms</span>
-                              {lazyWins && <span className="winner-indicator">✓ 勝利</span>}
+                              {lazyWinsTime && <span className="winner-indicator">✓ Faster</span>}
                             </>
                           ) : (
-                            <span className="error-text">エラー: {result.lazyImage.error || '処理失敗'}</span>
+                            <span className="error-text">Error: {result.lazyImage.error || 'Processing failed'}</span>
                           )}
                         </div>
                         {result.lazyImage.size != null && (
-                          <div className="size-value">{formatBytes(result.lazyImage.size)}</div>
+                          <div className="size-value">
+                            {formatBytes(result.lazyImage.size)}
+                            {lazyWinsSize && <span className="winner-indicator-size">✓ Smaller</span>}
+                          </div>
                         )}
                       </>
                     ) : (
                       '×'
                     )}
                   </td>
-                  <td className={`result-cell ${sharpWins ? 'winner' : ''} ${!result.sharp?.supported ? 'not-supported' : ''}`}>
+                  <td className={`result-cell ${sharpWinsTime || sharpWinsSize ? 'winner' : ''} ${!result.sharp?.supported ? 'not-supported' : ''}`}>
                     {result.sharp?.supported ? (
                       <>
                         <div className="time-value">
                           {result.sharp.time != null ? (
                             <>
                               <span>{result.sharp.time}ms</span>
-                              {sharpWins && <span className="winner-indicator">✓ 勝利</span>}
+                              {sharpWinsTime && <span className="winner-indicator">✓ Faster</span>}
                             </>
                           ) : (
-                            <span className="error-text">エラー: {result.sharp.error || '処理失敗'}</span>
+                            <span className="error-text">Error: {result.sharp.error || 'Processing failed'}</span>
                           )}
                         </div>
                         {result.sharp.size != null && (
-                          <div className="size-value">{formatBytes(result.sharp.size)}</div>
+                          <div className="size-value">
+                            {formatBytes(result.sharp.size)}
+                            {sharpWinsSize && <span className="winner-indicator-size">✓ Smaller</span>}
+                          </div>
                         )}
                       </>
                     ) : (
@@ -341,6 +365,28 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
                       )}
                     </div>
                   </td>
+                  <td>
+                    <div className="bar-container">
+                      {result.lazyImage?.size && (
+                        <div className="bar-wrapper">
+                          <span className="bar-label">lazy-image</span>
+                          <div
+                            className="bar lazy"
+                            style={{ width: `${(result.lazyImage.size / maxSize) * 150}px` }}
+                          ></div>
+                        </div>
+                      )}
+                      {result.sharp?.size && (
+                        <div className="bar-wrapper">
+                          <span className="bar-label">sharp</span>
+                          <div
+                            className="bar sharp"
+                            style={{ width: `${(result.sharp.size / maxSize) * 150}px` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
@@ -359,7 +405,7 @@ function PreviewSection({ results, selectedPreview, setSelectedPreview, getSelec
   return (
     <div className="preview-section">
       <div className="preview-header">
-        <h3>生成画像プレビュー</h3>
+        <h3>Generated Image Preview</h3>
         <div className="preview-tabs">
           {results.categories.map((cat, catIdx) => (
             cat.results.map((res, resIdx) => (
@@ -382,7 +428,7 @@ function PreviewSection({ results, selectedPreview, setSelectedPreview, getSelec
               <span>
                 {selectedResult.lazyImage.time != null 
                   ? `${selectedResult.lazyImage.time}ms / ${formatBytes(selectedResult.lazyImage.size)}`
-                  : `エラー: ${selectedResult.lazyImage.error || '処理失敗'}`}
+                  : `Error: ${selectedResult.lazyImage.error || 'Processing failed'}`}
               </span>
             </div>
             <img src={selectedResult.lazyImage.url} alt="lazy-image output" />
@@ -395,7 +441,7 @@ function PreviewSection({ results, selectedPreview, setSelectedPreview, getSelec
               <span>
                 {selectedResult.sharp.time != null 
                   ? `${selectedResult.sharp.time}ms / ${formatBytes(selectedResult.sharp.size)}`
-                  : `エラー: ${selectedResult.sharp.error || '処理失敗'}`}
+                  : `Error: ${selectedResult.sharp.error || 'Processing failed'}`}
               </span>
             </div>
             <img src={selectedResult.sharp.url} alt="sharp output" />

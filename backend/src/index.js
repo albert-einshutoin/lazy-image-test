@@ -70,29 +70,29 @@ async function runBenchmark(inputPath, sessionId) {
     categories: []
   };
 
-  // カテゴリ1: Zero-Copy変換 (リサイズなし) - lazy-imageの強み
+  // Category 1: Zero-Copy conversion (no resize) - lazy-image's strength
   const zeroCopyResults = await runZeroCopyTests(inputPath, outputDir, sessionId);
   results.categories.push({
-    name: 'Zero-Copy変換 (リサイズなし)',
-    description: 'lazy-imageの強み: ピクセルバッファをコピーせず直接変換',
+    name: 'Zero-Copy Conversion (No Resize)',
+    description: 'lazy-image\'s strength: Direct conversion without copying pixel buffers',
     highlight: 'lazyImage',
     results: zeroCopyResults
   });
 
-  // カテゴリ2: リサイズ + 変換 - 共通機能
+  // Category 2: Resize + Conversion - Common features
   const resizeResults = await runResizeTests(inputPath, outputDir, sessionId, originalMetadata);
   results.categories.push({
-    name: 'リサイズ + フォーマット変換',
-    description: '共通機能: 800x600にリサイズ後、各フォーマットに変換',
+    name: 'Resize + Format Conversion',
+    description: 'Common features: Resize to 800x600, then convert to each format',
     highlight: null,
     results: resizeResults
   });
 
-  // カテゴリ3: 多機能操作 - sharpの強み
+  // Category 3: Advanced operations - sharp's strength
   const advancedResults = await runAdvancedTests(inputPath, outputDir, sessionId);
   results.categories.push({
-    name: '多機能な画像操作',
-    description: 'sharpの強み: lazy-imageでは非対応の高度な操作',
+    name: 'Advanced Image Operations',
+    description: 'sharp\'s strength: Advanced operations not supported by lazy-image',
     highlight: 'sharp',
     results: advancedResults
   });
@@ -105,9 +105,9 @@ async function runZeroCopyTests(inputPath, outputDir, sessionId) {
   const results = [];
   const inputBuffer = fs.readFileSync(inputPath);
 
-  // WebP変換 (リサイズなし)
+  // WebP conversion (no resize)
   results.push(await runSingleTest({
-    operation: 'WebP変換 (リサイズなし)',
+    operation: 'WebP Conversion (No Resize)',
     inputPath,
     inputBuffer,
     outputDir,
@@ -123,9 +123,9 @@ async function runZeroCopyTests(inputPath, outputDir, sessionId) {
     sharpSupported: true
   }));
 
-  // AVIF変換 (リサイズなし)
+  // AVIF conversion (no resize)
   results.push(await runSingleTest({
-    operation: 'AVIF変換 (リサイズなし)',
+    operation: 'AVIF Conversion (No Resize)',
     inputPath,
     inputBuffer,
     outputDir,
@@ -141,9 +141,9 @@ async function runZeroCopyTests(inputPath, outputDir, sessionId) {
     sharpSupported: true
   }));
 
-  // JPEG再圧縮 (リサイズなし)
+  // JPEG compression (no resize)
   results.push(await runSingleTest({
-    operation: 'JPEG圧縮 (リサイズなし)',
+    operation: 'JPEG Compression (No Resize)',
     inputPath,
     inputBuffer,
     outputDir,
@@ -169,9 +169,9 @@ async function runResizeTests(inputPath, outputDir, sessionId, metadata) {
   const targetWidth = 800;
   const targetHeight = 600;
 
-  // リサイズ + WebP
+  // Resize + WebP
   results.push(await runSingleTest({
-    operation: 'リサイズ + WebP',
+    operation: 'Resize + WebP',
     inputPath,
     inputBuffer,
     outputDir,
@@ -187,9 +187,9 @@ async function runResizeTests(inputPath, outputDir, sessionId, metadata) {
     sharpSupported: true
   }));
 
-  // リサイズ + AVIF
+  // Resize + AVIF
   results.push(await runSingleTest({
-    operation: 'リサイズ + AVIF',
+    operation: 'Resize + AVIF',
     inputPath,
     inputBuffer,
     outputDir,
@@ -205,9 +205,9 @@ async function runResizeTests(inputPath, outputDir, sessionId, metadata) {
     sharpSupported: true
   }));
 
-  // リサイズ + JPEG
+  // Resize + JPEG
   results.push(await runSingleTest({
-    operation: 'リサイズ + JPEG',
+    operation: 'Resize + JPEG',
     inputPath,
     inputBuffer,
     outputDir,
@@ -231,9 +231,9 @@ async function runAdvancedTests(inputPath, outputDir, sessionId) {
   const results = [];
   const inputBuffer = fs.readFileSync(inputPath);
 
-  // PNG圧縮
+  // PNG compression
   results.push(await runSingleTest({
-    operation: 'PNG圧縮',
+    operation: 'PNG Compression',
     inputPath,
     inputBuffer,
     outputDir,
@@ -247,9 +247,9 @@ async function runAdvancedTests(inputPath, outputDir, sessionId) {
     sharpSupported: true
   }));
 
-  // 回転
+  // Rotation
   results.push(await runSingleTest({
-    operation: '90度回転',
+    operation: '90° Rotation',
     inputPath,
     inputBuffer,
     outputDir,
@@ -263,9 +263,9 @@ async function runAdvancedTests(inputPath, outputDir, sessionId) {
     sharpSupported: true
   }));
 
-  // クロップ
+  // Crop
   results.push(await runSingleTest({
-    operation: 'クロップ (中央50%)',
+    operation: 'Crop (Center 50%)',
     inputPath,
     inputBuffer,
     outputDir,
@@ -284,9 +284,9 @@ async function runAdvancedTests(inputPath, outputDir, sessionId) {
     sharpSupported: true
   }));
 
-  // ぼかし
+  // Blur
   results.push(await runSingleTest({
-    operation: 'ぼかし (sigma: 5)',
+    operation: 'Blur (sigma: 5)',
     inputPath,
     inputBuffer,
     outputDir,
@@ -300,9 +300,9 @@ async function runAdvancedTests(inputPath, outputDir, sessionId) {
     sharpSupported: true
   }));
 
-  // グレースケール
+  // Grayscale
   results.push(await runSingleTest({
-    operation: 'グレースケール',
+    operation: 'Grayscale',
     inputPath,
     inputBuffer,
     outputDir,
