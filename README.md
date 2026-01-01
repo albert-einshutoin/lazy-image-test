@@ -1,3 +1,6 @@
+<img width="1353" height="964" alt="スクリーンショット 2025-12-31 15 55 47 1" src="https://github.com/user-attachments/assets/5e336131-7d49-4913-ae5d-0c3f825505e1" />
+
+
 # lazy-image performance test (sharp vs lazy-image)
 
 ## Overview
