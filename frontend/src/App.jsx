@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
@@ -6,6 +6,31 @@ function formatBytes(bytes) {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatMemory(memoryMB) {
+  if (memoryMB == null || isNaN(memoryMB)) return '-';
+  
+  // 負の値の場合は0として扱う（ガベージコレクションの影響で処理後にメモリが減ることがある）
+  // 実際のメモリ使用量は処理中のピークメモリで測定されているため、負の値は測定誤差
+  const memory = Math.max(0, memoryMB);
+  
+  if (memory < 0.0001) {
+    // 0.0001MB（約0.1KB）未満は「< 0.1 KB」と表示
+    return '< 0.1 KB';
+  } else if (memory < 0.1) {
+    // 0.1MB未満はKBで表示（小数点以下1桁）
+    const kb = memory * 1024;
+    // 0.1KB未満の場合は最小0.1KBと表示
+    return `${Math.max(0.1, kb).toFixed(1)} KB`;
+  } else if (memory < 1024) {
+    // 1GB未満はMBで表示
+    return `${memory.toFixed(2)} MB`;
+  } else {
+    // 1GB以上はGBで表示
+    const gb = memory / 1024;
+    return `${gb.toFixed(2)} GB`;
+  }
 }
 
 function getMaxTime(results) {
@@ -34,6 +59,30 @@ function App() {
   const [selectedPreview, setSelectedPreview] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [versions, setVersions] = useState({ lazyImage: 'unknown', sharp: 'unknown' });
+
+  // バージョン情報を取得
+  useEffect(() => {
+    const fetchVersions = async () => {
+      try {
+        const response = await fetch('/api/versions');
+        if (response.ok) {
+          const data = await response.json();
+          setVersions({
+            lazyImage: data.lazyImage || 'unknown',
+            sharp: data.sharp || 'unknown'
+          });
+        } else {
+          console.warn('Failed to fetch versions:', response.status);
+          setVersions({ lazyImage: 'unknown', sharp: 'unknown' });
+        }
+      } catch (err) {
+        console.error('Error fetching versions:', err);
+        setVersions({ lazyImage: 'unknown', sharp: 'unknown' });
+      }
+    };
+    fetchVersions();
+  }, []);
 
   const handleUpload = useCallback(async (file) => {
     // File size check (10GB limit)
@@ -150,8 +199,8 @@ function App() {
         <h1>lazy-image vs sharp</h1>
         <p>Real-time benchmark comparison of image processing libraries</p>
         <div className="version-badges">
-          <span className="badge rust">lazy-image {results?.versions?.lazyImage || '0.8.x'}</span>
-          <span className="badge sharp">sharp {results?.versions?.sharp || 'latest'}</span>
+          <span className="badge rust">lazy-image {results?.versions?.lazyImage || versions.lazyImage}</span>
+          <span className="badge sharp">sharp {results?.versions?.sharp || versions.sharp}</span>
         </div>
       </header>
 
@@ -266,6 +315,7 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
               <th>Operation</th>
               <th>lazy-image</th>
               <th>sharp</th>
+              <th className="th-quality">Quality (SSIM / PSNR)</th>
               <th>Time Comparison</th>
               <th>Size Comparison</th>
             </tr>
@@ -286,6 +336,35 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
                 && result.lazyImage.size != null && result.sharp.size != null
                 && result.sharp.size < result.lazyImage.size;
               
+              // Memory comparison (smaller is better)
+              const lazyWinsMemory = result.lazyImage?.supported && result.sharp?.supported 
+                && result.lazyImage.memoryUsed != null && result.sharp.memoryUsed != null
+                && result.lazyImage.memoryUsed < result.sharp.memoryUsed;
+              const sharpWinsMemory = result.lazyImage?.supported && result.sharp?.supported 
+                && result.lazyImage.memoryUsed != null && result.sharp.memoryUsed != null
+                && result.sharp.memoryUsed < result.lazyImage.memoryUsed;
+              
+              // Quality comparison (higher is better)
+              // SSIM優先、差が0.001未満の場合はPSNRで比較
+              const lazySSIM = result.lazyImage?.ssim || 0;
+              const sharpSSIM = result.sharp?.ssim || 0;
+              const lazyPSNR = result.lazyImage?.psnr || 0;
+              const sharpPSNR = result.sharp?.psnr || 0;
+              
+              const ssimDiff = Math.abs(lazySSIM - sharpSSIM);
+              let lazyWinsQuality = false;
+              let sharpWinsQuality = false;
+              
+              if (ssimDiff > 0.001) {
+                // SSIMの差が大きい場合はSSIMで判定
+                lazyWinsQuality = lazySSIM > sharpSSIM;
+                sharpWinsQuality = sharpSSIM > lazySSIM;
+              } else if (lazyPSNR > 0 && sharpPSNR > 0) {
+                // SSIMの差が小さい場合はPSNRで判定
+                lazyWinsQuality = lazyPSNR > sharpPSNR;
+                sharpWinsQuality = sharpPSNR > lazyPSNR;
+              }
+
               const isSelected = selectedPreview?.category === catIdx && selectedPreview?.result === resIdx;
 
               return (
@@ -295,13 +374,21 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
                   style={{ cursor: 'pointer', background: isSelected ? 'rgba(88, 166, 255, 0.1)' : undefined }}
                 >
                   <td className="operation-name">{result.operation}</td>
-                  <td className={`result-cell ${lazyWinsTime || lazyWinsSize ? 'winner' : ''} ${!result.lazyImage?.supported ? 'not-supported' : ''}`}>
+                  <td className={`result-cell ${lazyWinsTime || lazyWinsSize || lazyWinsMemory ? 'winner' : ''} ${!result.lazyImage?.supported ? 'not-supported' : ''}`}>
                     {result.lazyImage?.supported ? (
                       <>
                         <div className="time-value">
                           {result.lazyImage.time != null ? (
                             <>
                               <span>{result.lazyImage.time}ms</span>
+                              {result.lazyImage.totalTime != null && result.lazyImage.totalTime !== result.lazyImage.time && (
+                                <span className="total-time"> (Total: {result.lazyImage.totalTime}ms)</span>
+                              )}
+                              {result.lazyImage.avifConversionTime != null && (
+                                <span className="avif-conversion-time" title="AVIF to JPEG conversion time">
+                                  [AVIF conv: {result.lazyImage.avifConversionTime}ms]
+                                </span>
+                              )}
                               {lazyWinsTime && <span className="winner-indicator">✓ Faster</span>}
                             </>
                           ) : (
@@ -314,12 +401,18 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
                             {lazyWinsSize && <span className="winner-indicator-size">✓ Smaller</span>}
                           </div>
                         )}
+                        {result.lazyImage.memoryUsed != null && (
+                          <div className="memory-value" title="Memory usage during processing">
+                            💾 {formatMemory(result.lazyImage.memoryUsed)}
+                            {lazyWinsMemory && <span className="winner-indicator-memory">✓ Less Memory</span>}
+                          </div>
+                        )}
                       </>
                     ) : (
                       '×'
                     )}
                   </td>
-                  <td className={`result-cell ${sharpWinsTime || sharpWinsSize ? 'winner' : ''} ${!result.sharp?.supported ? 'not-supported' : ''}`}>
+                  <td className={`result-cell ${sharpWinsTime || sharpWinsSize || sharpWinsMemory ? 'winner' : ''} ${!result.sharp?.supported ? 'not-supported' : ''}`}>
                     {result.sharp?.supported ? (
                       <>
                         <div className="time-value">
@@ -338,11 +431,46 @@ function CategorySection({ category, catIdx, selectedPreview, setSelectedPreview
                             {sharpWinsSize && <span className="winner-indicator-size">✓ Smaller</span>}
                           </div>
                         )}
+                        {result.sharp.memoryUsed != null && (
+                          <div className="memory-value" title="Memory usage during processing">
+                            💾 {formatMemory(result.sharp.memoryUsed)}
+                            {sharpWinsMemory && <span className="winner-indicator-memory">✓ Less Memory</span>}
+                          </div>
+                        )}
                       </>
                     ) : (
                       '×'
                     )}
                   </td>
+                  
+                  {/* Quality Column */}
+                  <td className="result-cell">
+                    {(result.lazyImage?.ssim != null || result.sharp?.ssim != null) ? (
+                       <div className="quality-container">
+                         {result.lazyImage?.ssim != null && (
+                           <div className={`quality-value ${lazyWinsQuality ? 'quality-winner' : ''}`}>
+                             <span className="label">Lazy:</span>
+                             <span className="metric">S:{result.lazyImage.ssim.toFixed(4)}</span>
+                             <span className="metric-sep">/</span>
+                             <span className="metric">P:{result.lazyImage.psnr}dB</span>
+                             {lazyWinsQuality && <span className="winner-indicator-quality">✓ Better</span>}
+                           </div>
+                         )}
+                         {result.sharp?.ssim != null && (
+                           <div className={`quality-value ${sharpWinsQuality ? 'quality-winner' : ''}`}>
+                             <span className="label">Sharp:</span>
+                             <span className="metric">S:{result.sharp.ssim.toFixed(4)}</span>
+                             <span className="metric-sep">/</span>
+                             <span className="metric">P:{result.sharp.psnr}dB</span>
+                             {sharpWinsQuality && <span className="winner-indicator-quality">✓ Better</span>}
+                           </div>
+                         )}
+                       </div>
+                    ) : (
+                      <span className="text-secondary">-</span>
+                    )}
+                  </td>
+
                   <td>
                     <div className="bar-container">
                       {result.lazyImage?.time && (
@@ -425,11 +553,28 @@ function PreviewSection({ results, selectedPreview, setSelectedPreview, getSelec
           <div className="preview-card">
             <div className="preview-card-header">
               <h4>lazy-image</h4>
-              <span>
-                {selectedResult.lazyImage.time != null 
-                  ? `${selectedResult.lazyImage.time}ms / ${formatBytes(selectedResult.lazyImage.size)}`
-                  : `Error: ${selectedResult.lazyImage.error || 'Processing failed'}`}
-              </span>
+              <div className="preview-stats">
+                 {selectedResult.lazyImage.time != null ? (
+                   <>
+                     <span>
+                       {selectedResult.lazyImage.time}ms
+                       {selectedResult.lazyImage.totalTime != null && selectedResult.lazyImage.totalTime !== selectedResult.lazyImage.time && (
+                         <span className="total-time"> (Total: {selectedResult.lazyImage.totalTime}ms)</span>
+                       )}
+                       {selectedResult.lazyImage.avifConversionTime != null && (
+                         <span className="avif-conversion-time"> [AVIF: {selectedResult.lazyImage.avifConversionTime}ms]</span>
+                       )}
+                     </span>
+                     {selectedResult.lazyImage.size != null && <span> / {formatBytes(selectedResult.lazyImage.size)}</span>}
+                     {selectedResult.lazyImage.memoryUsed != null && <span> / 💾 {formatMemory(selectedResult.lazyImage.memoryUsed)}</span>}
+                     {selectedResult.lazyImage.ssim && (
+                       <span className="preview-quality"> / SSIM: {selectedResult.lazyImage.ssim.toFixed(4)}</span>
+                     )}
+                   </>
+                 ) : (
+                   <span>Error: {selectedResult.lazyImage.error || 'Processing failed'}</span>
+                 )}
+              </div>
             </div>
             <img src={selectedResult.lazyImage.url} alt="lazy-image output" />
           </div>
@@ -438,11 +583,20 @@ function PreviewSection({ results, selectedPreview, setSelectedPreview, getSelec
           <div className="preview-card">
             <div className="preview-card-header">
               <h4>sharp</h4>
-              <span>
-                {selectedResult.sharp.time != null 
-                  ? `${selectedResult.sharp.time}ms / ${formatBytes(selectedResult.sharp.size)}`
-                  : `Error: ${selectedResult.sharp.error || 'Processing failed'}`}
-              </span>
+              <div className="preview-stats">
+                 {selectedResult.sharp.time != null ? (
+                   <>
+                     <span>{selectedResult.sharp.time}ms</span>
+                     {selectedResult.sharp.size != null && <span> / {formatBytes(selectedResult.sharp.size)}</span>}
+                     {selectedResult.sharp.memoryUsed != null && <span> / 💾 {formatMemory(selectedResult.sharp.memoryUsed)}</span>}
+                     {selectedResult.sharp.ssim && (
+                       <span className="preview-quality"> / SSIM: {selectedResult.sharp.ssim.toFixed(4)}</span>
+                     )}
+                   </>
+                 ) : (
+                   <span>Error: {selectedResult.sharp.error || 'Processing failed'}</span>
+                 )}
+              </div>
             </div>
             <img src={selectedResult.sharp.url} alt="sharp output" />
           </div>

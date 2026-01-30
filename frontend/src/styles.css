@@ -279,6 +279,51 @@ body {
   letter-spacing: 0.05em;
 }
 
+/* Quality Column */
+.th-quality {
+  min-width: 160px;
+}
+
+.quality-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.quality-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.quality-winner {
+  background: rgba(63, 185, 80, 0.1);
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.quality-value .label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  width: 45px;
+}
+
+.quality-value .metric {
+  color: var(--text-primary);
+}
+
+.quality-value.quality-winner .metric {
+  color: var(--accent-green);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
 .result-table tr:last-child td {
   border-bottom: none;
 }
@@ -431,6 +476,21 @@ body {
   color: var(--text-secondary);
 }
 
+.preview-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.preview-quality {
+  color: var(--accent-blue);
+  font-weight: 500;
+}
+
 .preview-card img {
   width: 100%;
   height: 200px;
@@ -474,7 +534,9 @@ body {
 }
 
 /* Winner indicator */
-.winner-indicator {
+.winner-indicator,
+.winner-indicator-memory,
+.winner-indicator-quality {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -494,6 +556,30 @@ body {
   padding: 0.15rem 0.5rem;
   background: rgba(248, 81, 73, 0.15);
   color: #f85149;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+}
+
+.winner-indicator-memory {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent-blue);
+  border-radius: 4px;
+  margin-left: 0.5rem;
+}
+
+.winner-indicator-quality {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--accent-yellow);
   border-radius: 4px;
   margin-left: 0.5rem;
 }
